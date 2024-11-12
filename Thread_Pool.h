@@ -73,6 +73,9 @@ private:
 	THREAD_POOL_MODE mode_;
 
 	std::atomic_bool is_started;
+
+	// wait for all threads to return
+	std::condition_variable exit_;
 };
 
 

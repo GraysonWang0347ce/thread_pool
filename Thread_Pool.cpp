@@ -32,13 +32,25 @@ Thread_Pool::Thread_Pool(THREAD_POOL_MODE mode,
 	is_started = false;
 }
 
-Thread_Pool::~Thread_Pool() {}
+Thread_Pool::~Thread_Pool()
+{
+	is_started = false;
+
+	std::unique_lock<std::mutex>lock(task_queue_mtx_);
+
+	not_empty_.notify_all();
+
+	// wait for all threads' return 
+	exit_.wait(lock, [&]()->bool {
+		return thread_pool_.size() == 0;
+		});
+}
 
 void Thread_Pool::set_mod(THREAD_POOL_MODE mode)
 {
 	if (started())
 		return;
-	
+
 	mode_ = mode;
 }
 
@@ -85,7 +97,7 @@ Result Thread_Pool::submit_task(std::shared_ptr<Task_Base> task_sptr)
 	{
 		// timeout
 		std::cerr << "Task Queue is full, sumbit error" << std::endl;
-		return Result(task_sptr,false);
+		return Result(task_sptr, false);
 	}
 
 	task_q_.emplace(task_sptr);
@@ -126,7 +138,7 @@ void Thread_Pool::thread_handler(std::thread::id tid)
 	//std::cout << "Begin thread " << std::this_thread::get_id() << std::endl;
 	//std::cout << "End thread " << std::this_thread::get_id() << std::endl;
 
-	while (TRUE)
+	while (started())
 	{
 		auto last_time = std::chrono::high_resolution_clock().now();
 
@@ -136,9 +148,9 @@ void Thread_Pool::thread_handler(std::thread::id tid)
 
 			// if THREAD_POOL_MODE::CACHED 
 			// to remove extra thread
-			if (mode_ == THREAD_POOL_MODE::MODE_CACHED)
+			while (task_q_.size() == 0)
 			{
-				while (task_q_.size() == 0)
+				if (mode_ == THREAD_POOL_MODE::MODE_CACHED)
 				{
 					if (std::cv_status::timeout ==
 						not_empty_.wait_for(lock,
@@ -154,28 +166,37 @@ void Thread_Pool::thread_handler(std::thread::id tid)
 							thread_pool_.erase(tid);
 							cur_thread_num_--;
 							idle_thread_size_--;
-							
+
 							std::cout << "Thread: " << tid << "Eliminated" << std::endl;
 							return;
 						}
 					}
 				}
+				else
+				{
+					// THREAD_POOL_MODE::FIXED
+					not_empty_.wait(lock);
+				}
+
+				// thread pool ends
+				if (!started())
+				{
+					thread_pool_.erase(tid);
+					exit_.notify_all();
+					return;
+				}
 			}
-			else
-			{
-				not_empty_.wait(lock,
-					[&]()->bool {return task_q_.size() > 0; });
-			}
-
-			idle_thread_size_--;
-
-			task = task_q_.front();
-			task_q_.pop();
-			task_num_--;
-
-			if (task_q_.size() > 0)
-				not_empty_.notify_all();
 		}
+
+		idle_thread_size_--;
+
+		task = task_q_.front();
+		task_q_.pop();
+		task_num_--;
+
+		if (task_q_.size() > 0)
+			not_empty_.notify_all();
+
 
 		not_full_.notify_all();
 
@@ -189,4 +210,8 @@ void Thread_Pool::thread_handler(std::thread::id tid)
 		last_time = std::chrono::high_resolution_clock().now();
 		idle_thread_size_++;
 	}
+
+	thread_pool_.erase(tid);
+	exit_.notify_all();
+	return;
 }
