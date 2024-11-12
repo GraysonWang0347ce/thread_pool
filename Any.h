@@ -30,7 +30,7 @@ private:
 	class Base
 	{
 	public:
-		
+		virtual ~Base() = default;
 	};
 
 	template<class T>

@@ -18,10 +18,13 @@ public:
 int main()
 {
 	Thread_Pool pool;
+	pool.set_mod(THREAD_POOL_MODE::MODE_CACHED);
 	pool.start();
 
-	pool.submit_task(std::make_shared<MyTask>());
+	auto res = pool.submit_task(std::make_shared<MyTask>());
 
-	std::this_thread::sleep_for(std::chrono::seconds(5));
+	std::cout << res.get().cast<int>();
+
+	// std::this_thread::sleep_for(std::chrono::seconds(5));
 	return 0;
 }

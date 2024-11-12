@@ -35,23 +35,34 @@ public:
 	Thread_Pool(const Thread_Pool&) = delete;
 	Thread_Pool& operator=(const Thread_Pool&) = delete;
 
-private:
-	void thread_handler();
+	void set_max_thread(const unsigned int num);
 
 private:
+	void thread_handler(std::thread::id tid);
+
+private:
+	inline bool started() const { return is_started; };
+
 	// thread lists
-	std::vector<std::unique_ptr<Thread>> thread_pool_;
+	// std::vector<std::unique_ptr<Thread>> thread_pool_;
+	std::unordered_map<std::thread::id, std::unique_ptr<Thread>> thread_pool_;
 
 	// initial count of threads(usually amount of cpu cores)
 	size_t init_thread_size_;
 	
+	std::atomic<unsigned int> cur_thread_num_;
+
 	// task queue
 	std::queue<std::shared_ptr<Task_Base>> task_q_;
 	
 	std::atomic_uint task_num_; 
+	std::atomic_uint idle_thread_size_;
 
 	// maximum amount of task_queue
 	unsigned int task_queue_threshold_;
+
+	// maximum amount of thread queue
+	unsigned int thread_queue_threshold_;
 
 	std::mutex task_queue_mtx_;
 
@@ -60,6 +71,8 @@ private:
 	std::condition_variable not_full_;
 
 	THREAD_POOL_MODE mode_;
+
+	std::atomic_bool is_started;
 };
 
 
