@@ -138,7 +138,7 @@ void Thread_Pool::thread_handler(std::thread::id tid)
 			// to remove extra thread
 			if (mode_ == THREAD_POOL_MODE::MODE_CACHED)
 			{
-				while (task_q_.size() > 0)
+				while (task_q_.size() == 0)
 				{
 					if (std::cv_status::timeout ==
 						not_empty_.wait_for(lock,
@@ -161,9 +161,11 @@ void Thread_Pool::thread_handler(std::thread::id tid)
 					}
 				}
 			}
-
-			not_empty_.wait(lock,
-				[&]()->bool {return task_q_.size() > 0; });
+			else
+			{
+				not_empty_.wait(lock,
+					[&]()->bool {return task_q_.size() > 0; });
+			}
 
 			idle_thread_size_--;
 
