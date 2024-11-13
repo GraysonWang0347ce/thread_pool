@@ -47,15 +47,18 @@ private:
 class Semaphore
 {
 public:
-	Semaphore(int limit = 0) :res_limit_(limit) {};
+	Semaphore(int limit = 0) :res_limit_(limit),is_exit_(false) {};
 
-	~Semaphore() = default;
+	~Semaphore() { is_exit_ = true; };
 
 	/*
 		@brief get a semaphore resource
 	*/
 	void wait()
 	{
+		if (is_exit_)
+			return;
+
 		std::unique_lock<std::mutex> lock(mtx_);
 		cond_.wait(lock, [&]()->bool {
 			return res_limit_ > 0;
@@ -69,12 +72,16 @@ public:
 	*/
 	void post()
 	{
+		if (is_exit_)
+			return;
+
 		std::unique_lock<std::mutex> lock(mtx_);
 		res_limit_++;
 
 		cond_.notify_all();
 	}
 private:
+	std::atomic_bool is_exit_;
 	std::mutex mtx_;
 	std::condition_variable cond_;
 	std::atomic_int res_limit_;

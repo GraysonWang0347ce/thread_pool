@@ -17,17 +17,21 @@ Thread_Pool::Thread_Pool(THREAD_POOL_MODE mode,
 	idle_thread_size_(0),
 	thread_queue_threshold_(300)
 {
+	size_t core_num;
 	// using current cpu cores number to init thread_pool
 #ifdef WIN32
 	SYSTEM_INFO sysinfo;
 	GetSystemInfo(&sysinfo);
-	size_t core_num = sysinfo.dwNumberOfProcessors;
-
+	core_num = sysinfo.dwNumberOfProcessors;
+#endif
+	
+#ifdef __linux__
+	std::thread::hardware_concurrency();
+#endif
 	cur_thread_num_ = core_num;
 
 	//  std::cout << core_num << std::endl;
 	set_thread_pool_size(core_num);
-#endif
 
 	is_started = false;
 }
@@ -148,7 +152,8 @@ void Thread_Pool::thread_handler(std::thread::id tid)
 
 			// if THREAD_POOL_MODE::CACHED 
 			// to remove extra thread
-			while (task_q_.size() == 0)
+			while (started() &&
+				   task_q_.size() == 0)
 			{
 				if (mode_ == THREAD_POOL_MODE::MODE_CACHED)
 				{
@@ -179,12 +184,13 @@ void Thread_Pool::thread_handler(std::thread::id tid)
 				}
 
 				// thread pool ends
-				if (!started())
-				{
-					thread_pool_.erase(tid);
-					exit_.notify_all();
-					return;
-				}
+			}
+			if (!started())
+			{
+				/*thread_pool_.erase(tid);
+				exit_.notify_all();
+				return;*/
+				break; 
 			}
 		}
 

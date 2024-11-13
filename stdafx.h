@@ -9,6 +9,7 @@
 #include<condition_variable>
 #include<functional>
 #include<thread>
+#include<unordered_map>
 
 
 #ifdef _WIN32
